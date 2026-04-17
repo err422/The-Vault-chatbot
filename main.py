@@ -1,3 +1,7 @@
+#Setup commands 
+#source venv/bin/activate
+#pip install fastapi uvicorn pydantic
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
