@@ -82,7 +82,7 @@ async def get_recommendation(request: GameRequest):
     try:
         # 5. Call Gemini
         ai_response = client.models.generate_content(
-            model="gemini-2.5-flash", # Or whichever model string you successfully used earlier
+            model="gemini-3-flash-preview", # Or whichever model string you successfully used earlier
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
