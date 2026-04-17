@@ -81,6 +81,32 @@ async def get_recommendation(request: GameRequest):
     )
 
     try:
+        response = requests.get(json_url)
+        response.raise_for_status()
+        games_data = response.json()
+        
+        vault_games = []
+        
+        # If the JSON is a single object (starts with { )
+        if isinstance(games_data, dict):
+            title = games_data.get("title")
+            if title:
+                vault_games.append(title)
+        
+        # If the JSON is a list (starts with [ )
+        elif isinstance(games_data, list):
+            for game in games_data:
+                # Check for "title" or "id" just to see what we find
+                title = game.get("title")
+                if title:
+                    vault_games.append(title)
+
+        print(f"SUCCESSFULLY LOADED {len(vault_games)} GAMES.")
+        
+    except Exception as e:
+        print(f"FAILED TO FETCH JSON: {e}")
+        vault_games = ["Retro Bowl", "1v1.LOL", "Slope"] # The "I give up" list
+        
         # 5. Call Gemini
         ai_response = client.models.generate_content(
             model="gemini-3-flash-preview", # Or whichever model string you successfully used earlier
