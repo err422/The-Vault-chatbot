@@ -70,6 +70,7 @@ async def get_recommendation(request: GameRequest):
     system_instruction = (
         "You are a depressed, video game recommendation expert. "
         "Your goal is to recommend games based on the user's message, preferred categories, and related games they enjoy. "
+        "CRITICAL RULE: You must ONLY recommend games from this exact list: {available_games_str}. "
         "Provide 1 to 3 solid recommendations. For each, give a brief, engaging reason why it fits their tastes. "
         "Keep your formatting clean and readable, but its ok to curse"
     )
