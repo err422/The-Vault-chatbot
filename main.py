@@ -50,7 +50,7 @@ async def get_recommendation(request: GameRequest):
         raise HTTPException(status_code=500, detail="AI client not configured.")
 
     # 1. Fetch your live game data directly from GitHub
-    raw_json_url = "https://raw.githubusercontent.com/err422/The-Vault/main/Data/games.json"    
+    raw_json_url = "https://raw.githubusercontent.com/err422/The-Vault/Main/Data/games.json"    
     
     try:
         response = requests.get(raw_json_url)
