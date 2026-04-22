@@ -1,23 +1,19 @@
-#Setup commands 
-#source venv/bin/activate
-#pip install fastapi uvicorn pydantic
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-import requests
 
-# Load the secret API key from the .env file
+# Load the secret API keys from your .env file
 load_dotenv()
 
-# Initialize the FastAPI application
-app = FastAPI(title="Game Recommender Chatbot API")
+app = FastAPI(title="The Vault Chatbot API")
 
-# Add CORS middleware to allow your frontend to talk to this API
+# Add CORS middleware so your GitHub site can talk to your PC
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -26,12 +22,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the Gemini Client
-try:
-    client = genai.Client()
-except Exception as e:
-    print(f"Error initializing Gemini Client: {e}")
-    client = None
+# --- KEY ROTATION SETUP ---
+api_keys = [
+    os.getenv("GEMINI_API_KEY_1"),
+    os.getenv("GEMINI_API_KEY_2")
+]
+
+# Create a list of working clients
+clients = [genai.Client(api_key=k) for k in api_keys if k]
+current_key_index = 0
+
+if not clients:
+    print("❌ ERROR: No API keys found! Make sure .env has GEMINI_API_KEY_1 and _2")
+else:
+    print(f"✅ Loaded {len(clients)} API keys for rotation.")
 
 class GameRequest(BaseModel):
     user_message: str
@@ -43,10 +47,13 @@ class GameResponse(BaseModel):
 
 @app.post("/api/recommend", response_model=GameResponse)
 async def get_recommendation(request: GameRequest):
-    if not client:
-        raise HTTPException(status_code=500, detail="AI client not configured.")
+    global current_key_index
+    
+    # Check if we have any working AI clients
+    if not clients:
+        raise HTTPException(status_code=500, detail="AI keys are missing.")
 
-    # 1. Fetch your live game data directly from GitHub (Capital 'Main' included!)
+    # 1. Fetch your live game list from GitHub
     json_url = "https://raw.githubusercontent.com/err422/The-Vault/Main/Data/games.json"    
     vault_games = []
 
@@ -55,55 +62,43 @@ async def get_recommendation(request: GameRequest):
         response.raise_for_status() 
         games_data = response.json()
         
-        # 2. Robust Extraction (Handles both single objects and lists)
+        # Extract titles (handles single objects or lists)
         if isinstance(games_data, dict):
-            title = games_data.get("title")
-            if title:
-                vault_games.append(title)
+            if games_data.get("title"): vault_games.append(games_data.get("title"))
         elif isinstance(games_data, list):
             for game in games_data:
-                if isinstance(game, dict):
-                    title = game.get("title")
-                    if title:
-                        vault_games.append(title)
+                if isinstance(game, dict) and game.get("title"):
+                    vault_games.append(game.get("title"))
 
-        print(f"SUCCESSFULLY LOADED {len(vault_games)} GAMES.")
+        print(f"Successfully loaded {len(vault_games)} games from GitHub.")
         
     except Exception as e:
-        print(f"FAILED TO FETCH JSON: {e}")
-        # Fallback list just in case GitHub goes down
+        print(f"JSON Fetch Failed: {e}. Using fallback list.")
         vault_games = ["Retro Bowl", "1v1.LOL", "Slope", "Run 3"]
 
-    # Convert the list into a comma-separated string
-    if not vault_games: # Failsafe if the list is still empty
-        vault_games = ["Retro Bowl", "1v1.LOL", "Slope", "Run 3"]
-    
     available_games_str = ", ".join(vault_games)
 
-    # 3. System Instructions: The Depressed Expert
-    # Notice the 'f' prefix added to the string below!
+    # 2. Pick the NEXT AI client in the rotation
+    client = clients[current_key_index]
+    print(f"Using Key Index: {current_key_index}") # Helps you see it switching!
+    current_key_index = (current_key_index + 1) % len(clients)
+
+    # 3. Setup the Depressed Expert Persona
     system_instruction = (
-        "You are a depressed, video game recommendation expert. "
-        "Your goal is to recommend games based on the user's message, preferred categories, and related games they enjoy. "
-        f"CRITICAL RULE: You must ONLY recommend games from this exact list: {available_games_str}. "
-        "Provide 1 to 3 solid recommendations. For each, give a brief, engaging reason why it fits their tastes. "
-        "Keep your formatting clean and readable, but its ok to curse"
+        "You are a depressed video game recommendation expert. "
+        "You're tired of life and this job, but you still give good advice. "
+        f"CRITICAL RULE: any games you recommend MUST come from this list: {available_games_str}. "
+        "Provide 1-3 recommendations. It's okay to curse as much as you want "
     )
 
-    # 4. User Prompt
-    user_prompt = (
-        f"User Message: {request.user_message}\n\n"
-        "Please recommend a game from the approved list."
-    )
-
-    # 5. Call Gemini
     try:
+        # Generate the response
         ai_response = client.models.generate_content(
-            model="gemini-3-flash-preview", 
-            contents=user_prompt,
+            model="gemini-2.5-flash", 
+            contents=f"The user wants: {request.user_message}",
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.7,
+                temperature=0.8,
             )
         )
         
@@ -111,8 +106,9 @@ async def get_recommendation(request: GameRequest):
         
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        raise HTTPException(status_code=500, detail="Sorry, I couldn't think of a recommendation right now.")
-    
+        raise HTTPException(status_code=500, detail="The AI is too depressed to talk right now.")
+
 if __name__ == "__main__":
     import uvicorn
+    # This runs the server on your local PC
     uvicorn.run(app, host="0.0.0.0", port=8000)
