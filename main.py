@@ -90,7 +90,7 @@ async def get_recommendation(request: GameRequest):
     try:
         # Create a chat session with history
         chat = client.chats.create(
-            model="gemma-3-4b", 
+            model="gemini-2.0-flash", 
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.8,
